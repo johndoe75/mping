@@ -11,6 +11,12 @@ use tokio::time;
 struct Args {
     #[clap(value_delimiter = ' ', num_args = 1..)]
     hosts: Option<Vec<String>>,
+
+    #[clap(short, long)]
+    cound: Option<u16>,
+
+    #[clap(short, long)]
+    delay: Option<f32>,
 }
 
 #[tokio::main]
@@ -21,6 +27,12 @@ async fn main() {
         eprintln!("{}", "Failed to parse hosts.");
         std::process::exit(1);
     });
+
+    let count = cli.cound.unwrap_or(5);
+    let mut delay = cli.delay.unwrap_or(1.0);
+    if delay < 0.25 {
+        delay = 0.25;
+    }
 
     let mut tasks = Vec::new();
     let client_v4 = Client::new(&Config::default()).unwrap_or_else(|e| {
@@ -34,24 +46,30 @@ async fn main() {
 
     for host in hosts.iter() {
         match host.parse() {
-            Ok(IpAddr::V4(addr)) => {
-                tasks.push(tokio::spawn(ping(client_v4.clone(), IpAddr::V4(addr))))
-            }
-            Ok(IpAddr::V6(addr)) => {
-                tasks.push(tokio::spawn(ping(client_v6.clone(), IpAddr::V6(addr))))
-            }
+            Ok(IpAddr::V4(addr)) => tasks.push(tokio::spawn(ping(
+                client_v4.clone(),
+                IpAddr::V4(addr),
+                count,
+                delay,
+            ))),
+            Ok(IpAddr::V6(addr)) => tasks.push(tokio::spawn(ping(
+                client_v6.clone(),
+                IpAddr::V6(addr),
+                count,
+                delay,
+            ))),
             Err(e) => println!("{} parse to ipaddr error: {}", host, e),
         }
     }
 
     join_all(tasks).await;
 }
-async fn ping(client: Client, addr: IpAddr) {
+async fn ping(client: Client, addr: IpAddr, count: u16, delay: f32) {
     let payload = [0; 56];
     let mut pinger = client.pinger(addr, PingIdentifier(random())).await;
     pinger.timeout(Duration::from_secs(1));
-    let mut interval = time::interval(Duration::from_secs(1));
-    for idx in 0..5 {
+    let mut interval = time::interval(Duration::from_millis((delay * 1000.0) as u64));
+    for idx in 0..count {
         interval.tick().await;
         match pinger.ping(PingSequence(idx), &payload).await {
             Ok((IcmpPacket::V4(packet), dur)) => println!(
