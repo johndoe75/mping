@@ -4,6 +4,10 @@ use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_BORDERS_ONLY;
 use comfy_table::{ContentArrangement, Table};
 use futures::future::join_all;
+use mping::args::Args;
+use mping::display::DurationExt;
+use mping::ping::{PingResponse, PingResults};
+use mping::target::PingTarget;
 use rand::random;
 use std::net::IpAddr;
 use std::time::Duration;
@@ -11,116 +15,7 @@ use surge_ping::{Client, Config, ICMP, IcmpPacket, PingIdentifier, PingSequence}
 use tokio::net::lookup_host;
 use tokio::time;
 
-#[derive(Debug, Parser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    #[clap(value_delimiter = ' ', num_args = 1..)]
-    hosts: Option<Vec<String>>,
-
-    #[clap(short, long)]
-    count: Option<u16>,
-
-    #[clap(short, long)]
-    delay: Option<f32>,
-}
-
-#[derive(Debug)]
-struct PingTarget {
-    host: Option<String>,
-    addr: IpAddr,
-}
-
-// impl PingTarget {
-//     fn display(&self) -> String {
-//         match &self.host {
-//             Some(host) => format!("{} ({})", host, self.addr),
-//             None => self.addr.to_string(),
-//         }
-//     }
-// }
-
-#[derive(Debug)]
-struct PingResults {
-    target: PingTarget,
-    responses: Vec<PingResponse>,
-    min_duration: Option<Duration>,
-    max_duration: Option<Duration>,
-    avg_duration: Option<Duration>,
-    count_recv: u32,
-    success_rate: f32,
-    count_loss: u32,
-    drop_rate: f32,
-}
-
-impl PingResults {
-    fn new(target: PingTarget) -> Self {
-        Self {
-            target,
-            responses: vec![],
-            min_duration: None,
-            max_duration: None,
-            avg_duration: None,
-            count_recv: 0,
-            success_rate: 0.0,
-            count_loss: 0,
-            drop_rate: 0.0,
-        }
-    }
-
-    fn add_success(&mut self, response: PingResponse) {
-        self.count_recv += 1;
-        self.update_rates();
-        self.update_time_stats(response.duration);
-        self.responses.push(response);
-    }
-
-    fn add_drop(&mut self) {
-        self.count_loss += 1;
-        self.update_rates();
-    }
-
-    fn update_rates(&mut self) {
-        let total = self.count_recv + self.count_loss;
-        if total == 0 {
-            return;
-        }
-        self.success_rate = self.count_recv as f32 / total as f32;
-        self.drop_rate = 1.0 - self.success_rate;
-    }
-
-    fn update_time_stats(&mut self, time: Duration) {
-        self.min_duration = Some(self.min_duration.map_or(time, |min| min.min(time)));
-        self.max_duration = Some(self.max_duration.map_or(time, |max| max.max(time)));
-        self.avg_duration = Some(self.avg_duration.map_or(time, |avg| avg + time) / 2);
-    }
-}
-
-#[derive(Debug)]
-struct PingResponse {
-    // index: u16,
-    // size: usize,
-    // ttl: u8,
-    // sequence: PingSequence,
-    duration: Duration,
-}
-
 // Extend the duration type with a human-readable output of a duration.
-trait DurationExt {
-    fn display(&self) -> String;
-}
-
-impl DurationExt for Duration {
-    fn display(&self) -> String {
-        let millis = self.as_secs_f64() * 1000.0;
-
-        match millis {
-            m if m >= 1000.0 => format!("{:.2} s", m / 1000.0),
-            m if m >= 1.0 => format!("{:.2} ms", m),
-            m => format!("{:.2} μs", m * 1000.0),
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() {
     let cli = Args::parse();
