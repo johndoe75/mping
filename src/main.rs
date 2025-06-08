@@ -18,7 +18,7 @@ struct Args {
     hosts: Option<Vec<String>>,
 
     #[clap(short, long)]
-    cound: Option<u16>,
+    count: Option<u16>,
 
     #[clap(short, long)]
     delay: Option<f32>,
@@ -130,7 +130,7 @@ async fn main() {
         std::process::exit(1);
     });
 
-    let number_pings = cli.cound.unwrap_or(5);
+    let number_pings = cli.count.unwrap_or(5);
     let mut ping_delay = cli.delay.unwrap_or(1.0);
     if ping_delay < 0.1 {
         ping_delay = 0.1;
@@ -181,7 +181,7 @@ async fn main() {
         .load_preset(UTF8_BORDERS_ONLY)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["Host", "IP", "Sent", "Recv", "Loss", "Avg"]);
+        .set_header(vec!["Host", "Addr", "Sent", "Recv", "Loss", "Avg"]);
 
     let overall_sent = results
         .iter()
@@ -202,6 +202,7 @@ async fn main() {
         table.add_row(vec![
             results.target.host.unwrap_or_else(|| "-".to_string()),
             results.target.addr.to_string(),
+            (results.count_loss + results.count_recv).to_string(),
             results.count_recv.to_string(),
             results.count_loss.to_string(),
             results
@@ -210,7 +211,7 @@ async fn main() {
                 .unwrap_or_else(|| "N/A".to_string()),
         ]);
     }
-    print!("\t{}\n\n", table);
+    print!("\n{}\n\n", table);
     println!(
         "Overall {} sent, {} received ({:.2} % loss)",
         overall_sent,
