@@ -1,5 +1,5 @@
-use std::time::Duration;
 use crate::target::PingTarget;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct PingResults {
@@ -12,6 +12,7 @@ pub struct PingResults {
     pub success_rate: f32,
     pub count_loss: u32,
     pub drop_rate: f32,
+    pub total_count: u32,
 }
 
 impl PingResults {
@@ -26,11 +27,13 @@ impl PingResults {
             success_rate: 0.0,
             count_loss: 0,
             drop_rate: 0.0,
+            total_count: 0,
         }
     }
 
     pub fn add_success(&mut self, response: PingResponse) {
         self.count_recv += 1;
+        self.add_total();
         self.update_rates();
         self.update_time_stats(response.duration);
         self.responses.push(response);
@@ -38,7 +41,12 @@ impl PingResults {
 
     pub fn add_drop(&mut self) {
         self.count_loss += 1;
+        self.add_total();
         self.update_rates();
+    }
+
+    pub fn add_total(&mut self) {
+        self.total_count += 1;
     }
 
     fn update_rates(&mut self) {
@@ -53,7 +61,13 @@ impl PingResults {
     fn update_time_stats(&mut self, time: Duration) {
         self.min_duration = Some(self.min_duration.map_or(time, |min| min.min(time)));
         self.max_duration = Some(self.max_duration.map_or(time, |max| max.max(time)));
-        self.avg_duration = Some(self.avg_duration.map_or(time, |avg| avg + time) / 2);
+
+        if self.count_recv == 1 {
+            self.avg_duration = Some(time);
+        } else if let Some(current_avg) = self.avg_duration {
+            let total_time = current_avg * (self.count_recv - 1) + time;
+            self.avg_duration = Some(total_time / self.count_recv);
+        }
     }
 }
 
