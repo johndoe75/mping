@@ -6,6 +6,8 @@ use std::net::IpAddr;
 use std::time::Duration;
 use surge_ping::{Client, Config, ICMP, IcmpPacket, PingIdentifier, PingSequence};
 // use tokio::task::id;
+use anyhow::{Result, anyhow};
+use tokio::net::lookup_host;
 use tokio::time;
 
 #[derive(Debug, Parser)]
@@ -22,20 +24,35 @@ struct Args {
 }
 
 #[derive(Debug)]
+struct PingTarget {
+    host: Option<String>,
+    addr: IpAddr,
+}
+
+impl PingTarget {
+    fn display(&self) -> String {
+        match &self.host {
+            Some(host) => format!("{} ({})", host, self.addr),
+            None => self.addr.to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PingResults {
+    target: PingTarget,
+    responses: Vec<PingResponse>,
+    count_received: u32,
+    count_dropped: u32,
+}
+
+#[derive(Debug)]
 struct PingResponse {
     index: u16,
     size: usize,
     ttl: u8,
     sequence: PingSequence,
     duration: Duration,
-}
-
-#[derive(Debug)]
-struct PingResults {
-    addr: IpAddr,
-    responses: Vec<PingResponse>,
-    count_ok: u32,
-    count_nok: u32,
 }
 
 #[tokio::main]
@@ -47,10 +64,23 @@ async fn main() {
         std::process::exit(1);
     });
 
-    let count = cli.cound.unwrap_or(5);
-    let mut delay = cli.delay.unwrap_or(1.0);
-    if delay < 0.25 {
-        delay = 0.25;
+    let number_pings = cli.cound.unwrap_or(5);
+    let mut ping_delay = cli.delay.unwrap_or(1.0);
+    if ping_delay < 0.25 {
+        ping_delay = 0.25;
+    }
+
+    let mut targets = Vec::new();
+    for host in hosts.iter() {
+        let target = match resolve_host(host).await {
+            Ok(target) => target,
+            Err(e) => {
+                eprintln!("{} resolve error: {}", host, e);
+                // Skip this host
+                continue;
+            }
+        };
+        targets.push(target);
     }
 
     let mut tasks = Vec::new();
@@ -63,29 +93,20 @@ async fn main() {
         std::process::exit(1);
     });
 
-    for host in hosts.iter() {
-        match host.parse() {
-            Ok(IpAddr::V4(addr)) => tasks.push(tokio::spawn(ping(
-                client_v4.clone(),
-                IpAddr::V4(addr),
-                count,
-                delay,
-            ))),
-            Ok(IpAddr::V6(addr)) => tasks.push(tokio::spawn(ping(
-                client_v6.clone(),
-                IpAddr::V6(addr),
-                count,
-                delay,
-            ))),
-            Err(e) => println!("{} parse to ipaddr error: {}", host, e),
-        }
+    for target in targets {
+        let client = match target.addr {
+            IpAddr::V4(_) => client_v4.clone(),
+            IpAddr::V6(_) => client_v6.clone(),
+        };
+
+        tasks.push(tokio::spawn(ping(client, target, number_pings, ping_delay)));
     }
 
     let results = join_all(tasks).await;
     for result in results {
         let results: PingResults = result.unwrap();
 
-        let success_rate = results.count_ok as f32 / (results.count_ok + results.count_nok) as f32;
+        let success_rate = results.count_received as f32 / (results.count_received + results.count_dropped) as f32;
         let drop_rate = 1.0 - success_rate;
 
         let output_color = match drop_rate {
@@ -99,22 +120,25 @@ async fn main() {
 
         println!(
             "{}: {} packets received, {} packets dropped, {}",
-            results.addr, results.count_ok, results.count_nok, drop_rate_output
+            results.target.display(),
+            results.count_received,
+            results.count_dropped,
+            drop_rate_output
         );
     }
 }
 
-async fn ping(client: Client, addr: IpAddr, count: u16, delay: f32) -> PingResults {
+async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> PingResults {
     let payload = [0; 56];
-    let mut pinger = client.pinger(addr, PingIdentifier(random())).await;
+    let mut pinger = client.pinger(target.addr, PingIdentifier(random())).await;
     pinger.timeout(Duration::from_secs(1));
     let mut interval = time::interval(Duration::from_millis((delay * 1000.0) as u64));
 
     let mut results = PingResults {
-        addr,
+        target,
         responses: vec![],
-        count_ok: 0,
-        count_nok: 0,
+        count_received: 0,
+        count_dropped: 0,
     };
 
     for index in 0..count {
@@ -129,7 +153,7 @@ async fn ping(client: Client, addr: IpAddr, count: u16, delay: f32) -> PingResul
                     duration,
                 };
                 results.responses.push(response);
-                results.count_ok += 1;
+                results.count_received += 1;
             }
             Ok((IcmpPacket::V6(packet), duration)) => {
                 let response = PingResponse {
@@ -140,14 +164,34 @@ async fn ping(client: Client, addr: IpAddr, count: u16, delay: f32) -> PingResul
                     duration,
                 };
                 results.responses.push(response);
-                results.count_ok += 1;
+                results.count_received += 1;
             }
             Err(e) => {
                 println!("{} ping error: {}", pinger.host, e);
-                results.count_nok += 1;
+                results.count_dropped += 1;
             }
         };
     }
     println!("[+] {} done.", pinger.host);
     results
+}
+
+async fn resolve_host(host: &str) -> anyhow::Result<PingTarget> {
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return Ok(PingTarget { host: None, addr: ip });
+    }
+
+    let mut addresses = lookup_host(format!("{}:53", host)).await?;
+
+    // FIXME:
+    //  For now, we take the first address from the results.  Later, we want to add the ability
+    //  to specify which address type (v4, v6) to prefer, e.g. by using a command line flag. Also
+    //  we might want to prefer IPv6 over IPv4 per default.
+    addresses
+        .next()
+        .map(|addr| PingTarget {
+            host: Some(host.to_string()),
+            addr: addr.ip(),
+        })
+        .ok_or_else(|| anyhow!("{}: no address found", host))
 }
