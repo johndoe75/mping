@@ -1,7 +1,113 @@
-# mping
 
+# mping - Multi-Host Ping Tool
 
-A multi-ping tool written in Rust
+A concurrent ping utility written in Rust for learning modern systems programming concepts.
+
+## Overview
+
+**mping** is a command-line tool that can ping multiple hosts simultaneously and display comprehensive statistics. This project serves as a practical learning exercise for exploring Rust's key features including async programming, error handling, and systems programming.
+
+## Learning Goals
+
+This project demonstrates several important Rust concepts:
+
+- **Async Programming**: Using `tokio` for concurrent network operations
+- **Error Handling**: Proper use of `Result<T>` and `anyhow` for error management
+- **CLI Development**: Building command-line interfaces with `clap`
+- **Network Programming**: ICMP ping implementation using `surge-ping`
+- **Data Structures**: Organizing code with structs, enums, and impl blocks
+- **Memory Safety**: Zero-cost abstractions and ownership patterns
+- **External Crates**: Integration with the Rust ecosystem
+
+## Features
+
+- **Concurrent Pinging**: Ping multiple hosts simultaneously using async/await
+- **Comprehensive Statistics**: Track sent/received packets, loss rates, and timing statistics
+- **Beautiful Output**: Formatted tables with UTF-8 borders using `comfy-table`
+- **Flexible Configuration**: Customizable ping count and delay intervals
+- **Cross-Platform**: Works on macOS, Linux, and Windows
+
+## Usage
+
+```bash
+# Ping multiple hosts with default settings (5 pings each)
+mping google.com 8.8.8.8 cloudflare.com
+
+# Customize ping count and delay
+mping -c 10 -d 0.5 example.com 1.1.1.1
+
+# Ping with specific parameters
+mping --count 20 --delay 2.0 github.com stackoverflow.com
+```
+
+## Sample Output
+
+```
+PING 3 hosts with 5 packets each ...
+
+┌─────────────────┬────────────────┬──────┬──────┬─────────┬──────────┐
+│ Host            │ IP             │ Sent │ Recv │ Loss %  │ Avg      │
+├─────────────────┼────────────────┼──────┼──────┼─────────┼──────────┤
+│ google.com      │ 142.250.80.14  │ 5    │ 5    │ 0.0%    │ 15.2ms   │
+│ -               │ 8.8.8.8        │ 5    │ 5    │ 0.0%    │ 12.8ms   │
+│ cloudflare.com  │ 104.16.132.229 │ 5    │ 5    │ 0.0%    │ 8.9ms    │
+└─────────────────┴────────────────┴──────┴──────┴─────────┴──────────┘
+
+Overall 15 sent, 15 received (0.00 % loss)
+```
+
+## Installation
+
+### Prerequisites
+- Rust 1.87.0 or later
+- Cargo package manager
+
+### Building from Source
+
+```bash
+git clone git@github.com:johndoe75/mping.git
+cd mping
+cargo build --release
+```
+
+### Running
+``` bash
+cargo run -- google.com 8.8.8.8
+```
+
+## Project Structure
+``` 
+src/
+├── main.rs          # Main application logic and async orchestration
+├── args.rs          # Command-line argument parsing with clap
+├── ping.rs          # Ping result structures and statistics
+├── stats.rs         # Overall statistics calculation
+├── target.rs        # Ping target representation
+└── display.rs       # Duration formatting utilities
+```
+
+## Dependencies
+- **tokio**: Async runtime for concurrent operations
+- : ICMP ping implementation **surge-ping**
+- : Command-line argument parsing **clap**
+- : Simplified error handling **anyhow**
+- : Beautiful table formatting **comfy-table**
+- **futures**: Async utilities
+- **colored**: Terminal color output
+- **rand**: Random number generation
+
+## Learning Resources
+This project explores concepts covered in:
+- [The Rust Programming Language Book](https://doc.rust-lang.org/book/)
+- [Async Programming in Rust](https://rust-lang.github.io/async-book/)
+- [Rust by Example](https://doc.rust-lang.org/rust-by-example/)
+
+## Contributing
+This is primarily a learning project, but contributions that enhance the educational value are welcome! Feel free to:
+- Add comments explaining complex concepts
+- Suggest alternative implementations
+- Improve error handling patterns
+- Add new features that demonstrate Rust concepts
 
 # 🤝 Fair Use Policy
 
