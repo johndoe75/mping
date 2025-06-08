@@ -1,15 +1,13 @@
+use anyhow::anyhow;
 use clap::Parser;
-use colored::*;
+use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+use comfy_table::presets::UTF8_BORDERS_ONLY;
+use comfy_table::{ContentArrangement, Table};
 use futures::future::join_all;
 use rand::random;
 use std::net::IpAddr;
 use std::time::Duration;
 use surge_ping::{Client, Config, ICMP, IcmpPacket, PingIdentifier, PingSequence};
-// use tokio::task::id;
-use anyhow::anyhow;
-use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-use comfy_table::presets::UTF8_FULL;
-use comfy_table::{ContentArrangement, Table};
 use tokio::net::lookup_host;
 use tokio::time;
 
@@ -32,14 +30,14 @@ struct PingTarget {
     addr: IpAddr,
 }
 
-impl PingTarget {
-    fn display(&self) -> String {
-        match &self.host {
-            Some(host) => format!("{} ({})", host, self.addr),
-            None => self.addr.to_string(),
-        }
-    }
-}
+// impl PingTarget {
+//     fn display(&self) -> String {
+//         match &self.host {
+//             Some(host) => format!("{} ({})", host, self.addr),
+//             None => self.addr.to_string(),
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 struct PingResults {
@@ -97,13 +95,22 @@ impl PingResults {
     }
 }
 
+#[derive(Debug)]
+struct PingResponse {
+    // index: u16,
+    // size: usize,
+    // ttl: u8,
+    // sequence: PingSequence,
+    duration: Duration,
+}
+
 // Extend the duration type with a human-readable output of a duration.
 trait DurationExt {
-    fn human_readable(&self) -> String;
+    fn display(&self) -> String;
 }
 
 impl DurationExt for Duration {
-    fn human_readable(&self) -> String {
+    fn display(&self) -> String {
         let millis = self.as_secs_f64() * 1000.0;
 
         match millis {
@@ -112,15 +119,6 @@ impl DurationExt for Duration {
             m => format!("{:.2} μs", m * 1000.0),
         }
     }
-}
-
-#[derive(Debug)]
-struct PingResponse {
-    index: u16,
-    size: usize,
-    ttl: u8,
-    sequence: PingSequence,
-    duration: Duration,
 }
 
 #[tokio::main]
@@ -134,8 +132,8 @@ async fn main() {
 
     let number_pings = cli.cound.unwrap_or(5);
     let mut ping_delay = cli.delay.unwrap_or(1.0);
-    if ping_delay < 0.25 {
-        ping_delay = 0.25;
+    if ping_delay < 0.1 {
+        ping_delay = 0.1;
     }
 
     let mut targets = Vec::new();
@@ -150,6 +148,12 @@ async fn main() {
         };
         targets.push(target);
     }
+
+    println!(
+        "PING {} hosts with {} packets each ...",
+        targets.len(),
+        number_pings
+    );
 
     let mut tasks = Vec::new();
     let client_v4 = Client::new(&Config::default()).unwrap_or_else(|e| {
@@ -173,11 +177,24 @@ async fn main() {
     let results = join_all(tasks).await;
 
     let mut table = Table::new();
-    // table.load_preset("compact");
-    table.load_preset(UTF8_FULL)
+    table
+        .load_preset(UTF8_BORDERS_ONLY)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec!["Host", "IP", "Sent", "Recv", "Loss", "Avg"]);
+
+    let overall_sent = results
+        .iter()
+        .map(|r| r.as_ref().unwrap().count_recv + r.as_ref().unwrap().count_loss)
+        .sum::<u32>();
+    let overall_recv = results
+        .iter()
+        .map(|r| r.as_ref().unwrap().count_recv)
+        .sum::<u32>();
+    let overall_loss = results
+        .iter()
+        .map(|r| r.as_ref().unwrap().count_loss)
+        .sum::<u32>();
 
     for host_ping_result in results {
         let results: PingResults = host_ping_result.unwrap();
@@ -185,13 +202,21 @@ async fn main() {
         table.add_row(vec![
             results.target.host.unwrap_or_else(|| "-".to_string()),
             results.target.addr.to_string(),
-            (results.count_recv + results.count_loss).to_string(),
             results.count_recv.to_string(),
             results.count_loss.to_string(),
-            results.avg_duration.map(|d| d.human_readable()).unwrap_or_else(|| "N/A".to_string()),
+            results
+                .avg_duration
+                .map(|d| d.display())
+                .unwrap_or_else(|| "N/A".to_string()),
         ]);
     }
-    println!("{}", table);
+    print!("\t{}\n\n", table);
+    println!(
+        "Overall {} sent, {} received ({:.2} % loss)",
+        overall_sent,
+        overall_recv,
+        (overall_loss as f64 / overall_sent as f64) * 100.0
+    );
 }
 
 async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> PingResults {
@@ -205,25 +230,13 @@ async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> Pin
     for index in 0..count {
         interval.tick().await;
         match pinger.ping(PingSequence(index), &payload).await {
-            Ok((IcmpPacket::V4(packet), duration)) => {
-                let response = PingResponse {
-                    index,
-                    size: packet.get_size(),
-                    ttl: packet.get_ttl().unwrap(),
-                    sequence: packet.get_sequence(),
-                    duration,
-                };
+            Ok((IcmpPacket::V4(_), duration)) => {
+                let response = PingResponse { duration };
 
                 results.add_success(response);
             }
-            Ok((IcmpPacket::V6(packet), duration)) => {
-                let response = PingResponse {
-                    index,
-                    size: packet.get_size(),
-                    ttl: 0,
-                    sequence: packet.get_sequence(),
-                    duration,
-                };
+            Ok((IcmpPacket::V6(_), duration)) => {
+                let response = PingResponse { duration };
 
                 results.add_success(response);
             }
@@ -233,7 +246,7 @@ async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> Pin
             }
         };
     }
-    println!("[+] {} done.", pinger.host);
+    // println!("[+] {} done.", pinger.host);
     results
 }
 
