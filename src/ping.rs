@@ -12,14 +12,13 @@ pub struct PingResults {
     pub success_rate: f32,
     pub count_loss: u32,
     pub drop_rate: f32,
-    pub total_count: u32,
 }
 
 impl PingResults {
     pub fn new(target: PingTarget) -> Self {
         Self {
             target,
-            responses: vec![],
+            responses: Vec::new(),
             min_duration: None,
             max_duration: None,
             avg_duration: None,
@@ -27,13 +26,11 @@ impl PingResults {
             success_rate: 0.0,
             count_loss: 0,
             drop_rate: 0.0,
-            total_count: 0,
         }
     }
 
     pub fn add_success(&mut self, response: PingResponse) {
         self.count_recv += 1;
-        self.add_total();
         self.update_rates();
         self.update_time_stats(response.duration);
         self.responses.push(response);
@@ -41,12 +38,11 @@ impl PingResults {
 
     pub fn add_drop(&mut self) {
         self.count_loss += 1;
-        self.add_total();
         self.update_rates();
     }
 
-    pub fn add_total(&mut self) {
-        self.total_count += 1;
+    pub fn total_count(&self) -> u32 {
+        self.count_recv + self.count_loss
     }
 
     fn update_rates(&mut self) {

@@ -160,7 +160,7 @@ fn create_results_table(results: &[PingResults]) -> Table {
         table.add_row(vec![
             result.target.host.as_deref().unwrap_or("-"),
             &result.target.addr.to_string(),
-            &result.total_count.to_string(),
+            &result.total_count().to_string(),
             &result.count_recv.to_string(),
             &format!("{:.1}%", result.drop_rate * 100.0),
             &result

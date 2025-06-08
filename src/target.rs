@@ -7,16 +7,23 @@ pub struct PingTarget {
 }
 
 impl PingTarget {
-    pub fn display(&self) -> String {
-        match &self.host {
-            Some(host) => format!("{} ({})", host, self.addr),
-            None => self.addr.to_string(),
+    pub fn new(addr: IpAddr) -> Self {
+        Self { host: None, addr }
+    }
+
+    pub fn with_host(host: String, addr: IpAddr) -> Self {
+        Self {
+            host: Some(host),
+            addr,
         }
     }
 }
 
 impl std::fmt::Display for PingTarget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.display())
+        match &self.host {
+            Some(host) => write!(f, "{} ({})", host, self.addr),
+            None => write!(f, "{}", self.addr),
+        }
     }
 }
