@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.39", features = ["default"] }
+clap = { version = "4.5.39", features = ["default", "derive"] }
 colored = "3.0.0"
 surge-ping = "0.8.2"
 futures = "0.3.31"

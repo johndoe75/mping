@@ -1,38 +1,50 @@
-use std::net::IpAddr;
-use std::time::Duration;
-
+use clap::Parser;
 use futures::future::join_all;
 use rand::random;
-use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence, ICMP};
+use std::net::IpAddr;
+use std::time::Duration;
+use surge_ping::{Client, Config, ICMP, IcmpPacket, PingIdentifier, PingSequence};
 use tokio::time;
 
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[clap(value_delimiter = ' ', num_args = 1..)]
+    hosts: Option<Vec<String>>,
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // test same url 114.114.114.114
-    let ips = [
-        "1.1.1.1",
-        "8.8.8.8",
-        "193.99.144.80", // heise.de
-        "9.9.9.9",
-        "2a01:4f8:2b01:d3e::2",
-    ];
-    let client_v4 = Client::new(&Config::default())?;
-    let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build())?;
+async fn main() {
+    let cli = Args::parse();
+
+    let hosts = cli.hosts.unwrap_or_else(|| {
+        eprintln!("{}", "Failed to parse hosts.");
+        std::process::exit(1);
+    });
+
     let mut tasks = Vec::new();
-    for ip in &ips {
-        match ip.parse() {
+    let client_v4 = Client::new(&Config::default()).unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    });
+    let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build()).unwrap_or_else(|e| {
+        eprintln!("{}", e);
+        std::process::exit(1);
+    });
+
+    for host in hosts.iter() {
+        match host.parse() {
             Ok(IpAddr::V4(addr)) => {
                 tasks.push(tokio::spawn(ping(client_v4.clone(), IpAddr::V4(addr))))
             }
             Ok(IpAddr::V6(addr)) => {
                 tasks.push(tokio::spawn(ping(client_v6.clone(), IpAddr::V6(addr))))
             }
-            Err(e) => println!("{} parse to ipaddr error: {}", ip, e),
+            Err(e) => println!("{} parse to ipaddr error: {}", host, e),
         }
     }
 
     join_all(tasks).await;
-    Ok(())
 }
 async fn ping(client: Client, addr: IpAddr) {
     let payload = [0; 56];
