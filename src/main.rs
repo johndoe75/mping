@@ -6,7 +6,10 @@ use std::net::IpAddr;
 use std::time::Duration;
 use surge_ping::{Client, Config, ICMP, IcmpPacket, PingIdentifier, PingSequence};
 // use tokio::task::id;
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
+use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+use comfy_table::presets::UTF8_FULL;
+use comfy_table::{ContentArrangement, Table};
 use tokio::net::lookup_host;
 use tokio::time;
 
@@ -42,8 +45,73 @@ impl PingTarget {
 struct PingResults {
     target: PingTarget,
     responses: Vec<PingResponse>,
-    count_received: u32,
-    count_dropped: u32,
+    min_duration: Option<Duration>,
+    max_duration: Option<Duration>,
+    avg_duration: Option<Duration>,
+    count_recv: u32,
+    success_rate: f32,
+    count_loss: u32,
+    drop_rate: f32,
+}
+
+impl PingResults {
+    fn new(target: PingTarget) -> Self {
+        Self {
+            target,
+            responses: vec![],
+            min_duration: None,
+            max_duration: None,
+            avg_duration: None,
+            count_recv: 0,
+            success_rate: 0.0,
+            count_loss: 0,
+            drop_rate: 0.0,
+        }
+    }
+
+    fn add_success(&mut self, response: PingResponse) {
+        self.count_recv += 1;
+        self.update_rates();
+        self.update_time_stats(response.duration);
+        self.responses.push(response);
+    }
+
+    fn add_drop(&mut self) {
+        self.count_loss += 1;
+        self.update_rates();
+    }
+
+    fn update_rates(&mut self) {
+        let total = self.count_recv + self.count_loss;
+        if total == 0 {
+            return;
+        }
+        self.success_rate = self.count_recv as f32 / total as f32;
+        self.drop_rate = 1.0 - self.success_rate;
+    }
+
+    fn update_time_stats(&mut self, time: Duration) {
+        self.min_duration = Some(self.min_duration.map_or(time, |min| min.min(time)));
+        self.max_duration = Some(self.max_duration.map_or(time, |max| max.max(time)));
+        self.avg_duration = Some(self.avg_duration.map_or(time, |avg| avg + time) / 2);
+    }
+}
+
+// Extend the duration type with a human-readable output of a duration.
+trait DurationExt {
+    fn human_readable(&self) -> String;
+}
+
+impl DurationExt for Duration {
+    fn human_readable(&self) -> String {
+        let millis = self.as_secs_f64() * 1000.0;
+
+        match millis {
+            m if m >= 1000.0 => format!("{:.2} s", m / 1000.0),
+            m if m >= 1.0 => format!("{:.2} ms", m),
+            m => format!("{:.2} μs", m * 1000.0),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -103,29 +171,27 @@ async fn main() {
     }
 
     let results = join_all(tasks).await;
-    for result in results {
-        let results: PingResults = result.unwrap();
 
-        let success_rate = results.count_received as f32 / (results.count_received + results.count_dropped) as f32;
-        let drop_rate = 1.0 - success_rate;
+    let mut table = Table::new();
+    // table.load_preset("compact");
+    table.load_preset(UTF8_FULL)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec!["Host", "IP", "Sent", "Recv", "Loss", "Avg"]);
 
-        let output_color = match drop_rate {
-            drop_rate if drop_rate >= 0.1 && drop_rate < 0.75 => colored::Color::BrightYellow,
-            drop_rate if drop_rate >= 0.75 => colored::Color::BrightRed,
-            _ => colored::Color::BrightGreen,
-        };
+    for host_ping_result in results {
+        let results: PingResults = host_ping_result.unwrap();
 
-        let drop_rate_output =
-            format!("{} % packets dropped", drop_rate * 100.0).color(output_color);
-
-        println!(
-            "{}: {} packets received, {} packets dropped, {}",
-            results.target.display(),
-            results.count_received,
-            results.count_dropped,
-            drop_rate_output
-        );
+        table.add_row(vec![
+            results.target.host.unwrap_or_else(|| "-".to_string()),
+            results.target.addr.to_string(),
+            (results.count_recv + results.count_loss).to_string(),
+            results.count_recv.to_string(),
+            results.count_loss.to_string(),
+            results.avg_duration.map(|d| d.human_readable()).unwrap_or_else(|| "N/A".to_string()),
+        ]);
     }
+    println!("{}", table);
 }
 
 async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> PingResults {
@@ -134,12 +200,7 @@ async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> Pin
     pinger.timeout(Duration::from_secs(1));
     let mut interval = time::interval(Duration::from_millis((delay * 1000.0) as u64));
 
-    let mut results = PingResults {
-        target,
-        responses: vec![],
-        count_received: 0,
-        count_dropped: 0,
-    };
+    let mut results: PingResults = PingResults::new(target);
 
     for index in 0..count {
         interval.tick().await;
@@ -152,8 +213,8 @@ async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> Pin
                     sequence: packet.get_sequence(),
                     duration,
                 };
-                results.responses.push(response);
-                results.count_received += 1;
+
+                results.add_success(response);
             }
             Ok((IcmpPacket::V6(packet), duration)) => {
                 let response = PingResponse {
@@ -163,12 +224,12 @@ async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> Pin
                     sequence: packet.get_sequence(),
                     duration,
                 };
-                results.responses.push(response);
-                results.count_received += 1;
+
+                results.add_success(response);
             }
             Err(e) => {
                 println!("{} ping error: {}", pinger.host, e);
-                results.count_dropped += 1;
+                results.add_drop();
             }
         };
     }
@@ -178,7 +239,10 @@ async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> Pin
 
 async fn resolve_host(host: &str) -> anyhow::Result<PingTarget> {
     if let Ok(ip) = host.parse::<IpAddr>() {
-        return Ok(PingTarget { host: None, addr: ip });
+        return Ok(PingTarget {
+            host: None,
+            addr: ip,
+        });
     }
 
     let mut addresses = lookup_host(format!("{}:53", host)).await?;

@@ -11,4 +11,6 @@ futures = "0.3.31"
 rand = "0.9.1"
 tokio = { version = "1.45.1", features = ["rt", "rt-multi-thread", "macros"] }
 anyhow = "1.0.98"
+comfy-table = { version = "7.1.4", features = ["custom_styling", "debug"] }
+tabled = "0.20.0"
 #time = "0.3.41"
