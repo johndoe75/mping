@@ -1,3 +1,4 @@
+use crate::constants::PERCENTAGE_FACTOR;
 use crate::ping::PingResults;
 
 #[derive(Debug, Default)]
@@ -19,7 +20,7 @@ impl OverallStats {
             total_received,
             total_lost,
             loss_percentage: if total_sent > 0 {
-                (total_lost as f64 / total_sent as f64) * 100.0
+                (total_lost as f64 / total_sent as f64) * PERCENTAGE_FACTOR
             } else {
                 0.0
             },

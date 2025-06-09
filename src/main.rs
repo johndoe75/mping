@@ -5,6 +5,7 @@ use comfy_table::presets::UTF8_BORDERS_ONLY;
 use comfy_table::{ContentArrangement, Table};
 use futures::future::join_all;
 use mping::args::Args;
+use mping::constants::{LOSS_TIMEOUT, MILLISECOND_IN_SECOND, PERCENTAGE_FACTOR};
 use mping::display::DurationExt;
 use mping::ping::{PingResponse, PingResults};
 use mping::stats::OverallStats;
@@ -97,8 +98,10 @@ async fn main() -> Result<()> {
 async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> PingResults {
     let payload = [0; 56];
     let mut pinger = client.pinger(target.addr, PingIdentifier(random())).await;
-    pinger.timeout(Duration::from_secs(1));
-    let mut interval = time::interval(Duration::from_millis((delay * 1000.0) as u64));
+    pinger.timeout(Duration::from_secs(LOSS_TIMEOUT as u64));
+    let mut interval = time::interval(Duration::from_millis(
+        (delay * MILLISECOND_IN_SECOND as f32) as u64,
+    ));
 
     let mut results: PingResults = PingResults::new(target);
 
@@ -156,7 +159,8 @@ fn create_results_table(results: &[PingResults]) -> Table {
             &result.target.addr.to_string(),
             &result.total_count().to_string(),
             &result.count_recv.to_string(),
-            &format!("{:.1}%", result.loss_rate * 100.0),
+            &format!("{:.1}%", result.loss_rate * PERCENTAGE_FACTOR as f32),
+            
             &result
                 .avg_duration
                 .map(|d| d.display())
