@@ -9,9 +9,9 @@ pub struct PingResults {
     pub max_duration: Option<Duration>,
     pub avg_duration: Option<Duration>,
     pub count_recv: u32,
-    pub success_rate: f32,
+    pub recv_rate: f32,
     pub count_loss: u32,
-    pub drop_rate: f32,
+    pub loss_rate: f32,
 }
 
 impl PingResults {
@@ -23,9 +23,9 @@ impl PingResults {
             max_duration: None,
             avg_duration: None,
             count_recv: 0,
-            success_rate: 0.0,
+            recv_rate: 0.0,
             count_loss: 0,
-            drop_rate: 0.0,
+            loss_rate: 0.0,
         }
     }
 
@@ -46,12 +46,12 @@ impl PingResults {
     }
 
     fn update_rates(&mut self) {
-        let total = self.count_recv + self.count_loss;
+        let total = self.total_count();
         if total == 0 {
             return;
         }
-        self.success_rate = self.count_recv as f32 / total as f32;
-        self.drop_rate = 1.0 - self.success_rate;
+        self.recv_rate = self.count_recv as f32 / total as f32;
+        self.loss_rate = 1.0 - self.recv_rate;
     }
 
     fn update_time_stats(&mut self, time: Duration) {
@@ -69,9 +69,5 @@ impl PingResults {
 
 #[derive(Debug)]
 pub struct PingResponse {
-    // index: u16,
-    // size: usize,
-    // ttl: u8,
-    // sequence: PingSequence,
     pub duration: Duration,
 }

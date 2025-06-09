@@ -18,7 +18,6 @@ use tokio::time;
 
 type Result<T> = anyhow::Result<T>;
 
-// Extend the duration type with a human-readable output of a duration.
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Args::parse();
@@ -150,11 +149,6 @@ async fn resolve_host(host: &str) -> anyhow::Result<PingTarget> {
 
 fn create_results_table(results: &[PingResults]) -> Table {
     let mut table = Table::new();
-    table
-        .load_preset(UTF8_BORDERS_ONLY)
-        .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["Host", "IP", "Sent", "Recv", "Loss %", "Avg"]);
 
     for result in results {
         table.add_row(vec![
@@ -162,7 +156,7 @@ fn create_results_table(results: &[PingResults]) -> Table {
             &result.target.addr.to_string(),
             &result.total_count().to_string(),
             &result.count_recv.to_string(),
-            &format!("{:.1}%", result.drop_rate * 100.0),
+            &format!("{:.1}%", result.loss_rate * 100.0),
             &result
                 .avg_duration
                 .map(|d| d.display())
