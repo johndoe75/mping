@@ -158,11 +158,11 @@ fn create_results_table(results: &[PingResults]) -> Table {
             result.target.host.as_deref().unwrap_or("-"),
             &result.target.addr.to_string(),
             &result.total_count().to_string(),
-            &result.count_recv.to_string(),
-            &format!("{:.1}%", result.loss_rate * PERCENTAGE_FACTOR as f32),
-            
+            &result.num_recv.to_string(),
+            &format!("{:.1}%", result.loss_rate() * PERCENTAGE_FACTOR as f32),
+
             &result
-                .avg_duration
+                .avg_duration()
                 .map(|d| d.display())
                 .unwrap_or_else(|| "N/A".to_string()),
         ]);
