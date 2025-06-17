@@ -10,7 +10,7 @@ pub struct OverallStats {
 }
 
 impl OverallStats {
-    pub fn from_results(results: &[PingResults]) -> Self {
+    pub fn from_results(results: &Vec<PingResults>) -> Self {
         let total_sent = results.iter().map(|r| r.total_count()).sum();
         let total_received = results.iter().map(|r| r.num_recv).sum();
         let total_lost = results.iter().map(|r| r.num_loss).sum();

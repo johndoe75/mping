@@ -41,14 +41,14 @@ impl PingResults {
         self.avg_duration
     }
 
-    pub fn add_success(&mut self, response: PingResponse) {
+    pub fn add_received(&mut self, response: PingResponse) {
         self.num_recv += 1;
         self.update_rates();
         self.update_time_stats(response.duration);
         self.responses.push(response);
     }
 
-    pub fn add_drop(&mut self) {
+    pub fn add_loss(&mut self) {
         self.num_loss += 1;
         self.update_rates();
     }

@@ -1,4 +1,3 @@
-use crate::constants::MILLISECOND_IN_SECOND;
 use std::time::Duration;
 
 pub trait DurationExt {
@@ -7,12 +6,13 @@ pub trait DurationExt {
 
 impl DurationExt for Duration {
     fn display(&self) -> String {
-        let millis = self.as_secs_f64() * MILLISECOND_IN_SECOND as f64;
+        let micros = self.as_micros() as f64;
 
-        match millis {
-            m if m >= 1000.0 => format!("{:.2} s", m / 1000.0),
-            m if m >= 1.0 => format!("{:.2} ms", m),
-            m => format!("{:.2} μs", m * 1000.0),
+        match micros {
+            m if m >= 1_000_000.0 => format!("{:.2} s", m / 1_000_000.0),
+            m if m >= 1_000.0 => format!("{:.2} ms", m / 1_000.0),
+            m if m >= 1.0 => format!("{:.2} μs", m),
+            m => format!("{:.2} ns", m * 1000.0),
         }
     }
 }

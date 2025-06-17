@@ -1,18 +1,25 @@
 
 # mping - Multi-Host Ping Tool
 
-A concurrent ping utility written in Rust for learning modern systems programming concepts.
+[![Fair OSS User](https://img.shields.io/badge/Fair--OSS--User-%E2%9C%94-green)](https://yourproject.org/fair-use)
+
+A concurrent ping utility written in Rust for learning modern systems
+programming concepts.
 
 ## Overview
 
-**mping** is a command-line tool that can ping multiple hosts simultaneously and display comprehensive statistics. This project serves as a practical learning exercise for exploring Rust's key features including async programming, error handling, and systems programming.
+**mping** is a command-line tool that can ping multiple hosts simultaneously
+and display comprehensive statistics. This project serves as a practical
+learning exercise for exploring Rust's key features including async
+programming, error handling, and systems programming.
 
 ## Learning Goals
 
 This project demonstrates several important Rust concepts:
 
 - **Async Programming**: Using `tokio` for concurrent network operations
-- **Error Handling**: Proper use of `Result<T>` and `anyhow` for error management
+- **Error Handling**: Proper use of `Result<T>` and `anyhow` for error
+  management
 - **CLI Development**: Building command-line interfaces with `clap`
 - **Network Programming**: ICMP ping implementation using `surge-ping`
 - **Data Structures**: Organizing code with structs, enums, and impl blocks
@@ -22,8 +29,10 @@ This project demonstrates several important Rust concepts:
 ## Features
 
 - **Concurrent Pinging**: Ping multiple hosts simultaneously using async/await
-- **Comprehensive Statistics**: Track sent/received packets, loss rates, and timing statistics
-- **Beautiful Output**: Formatted tables with UTF-8 borders using `comfy-table`
+- **Comprehensive Statistics**: Track sent/received packets, loss rates, and
+  timing statistics
+- **Beautiful Output**: Formatted tables with UTF-8 borders using
+  `comfy-table`
 - **Flexible Configuration**: Customizable ping count and delay intervals
 - **Cross-Platform**: Works on macOS, Linux, and Windows
 
@@ -40,20 +49,24 @@ mping -c 10 -d 0.5 example.com 1.1.1.1
 mping --count 20 --delay 2.0 github.com stackoverflow.com
 ```
 
+The minimum delay between packets is 100 ms to avoid flooding hosts with ICMP
+packets.  If you specify a smaller delay, it is automatically set to 100 ms. 
+
 ## Sample Output
 
 ```
-PING 3 hosts with 5 packets each ...
+PING 3 hosts with 5 packets each in 1.00 s intervals ...
+2a00:1450:4001:82f::200e ping error: Request timeout for icmp_seq 1
 
-┌─────────────────┬────────────────┬──────┬──────┬─────────┬──────────┐
-│ Host            │ IP             │ Sent │ Recv │ Loss %  │ Avg      │
-├─────────────────┼────────────────┼──────┼──────┼─────────┼──────────┤
-│ google.com      │ 142.250.80.14  │ 5    │ 5    │ 0.0%    │ 15.2ms   │
-│ -               │ 8.8.8.8        │ 5    │ 5    │ 0.0%    │ 12.8ms   │
-│ cloudflare.com  │ 104.16.132.229 │ 5    │ 5    │ 0.0%    │ 8.9ms    │
-└─────────────────┴────────────────┴──────┴──────┴─────────┴──────────┘
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Host             Addr                       Sent   Recv   Loss    Min        Max        Avg      │
+╞══════════════════════════════════════════════════════════════════════════════════════════════════╡
+│ google.com       2a00:1450:4001:82f::200e   5      4      20.0%   21.60 ms   50.84 ms   34.42 ms │
+│ -                8.8.8.8                    5      5      0.0%    24.16 ms   70.47 ms   43.10 ms │
+│ cloudflare.com   2606:4700::6810:84e5       5      5      0.0%    30.04 ms   70.28 ms   44.15 ms │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-Overall 15 sent, 15 received (0.00 % loss)
+Overall 15 sent, 14 received (6.67 % loss)
 ```
 
 ## Installation
@@ -103,7 +116,10 @@ This project explores concepts covered in:
 - [Rust by Example](https://doc.rust-lang.org/rust-by-example/)
 
 ## Contributing
-This is primarily a learning project, but contributions that enhance the educational value are welcome! Feel free to:
+
+This is primarily a learning project, but contributions that enhance the
+educational value are welcome! Feel free to:
+
 - Add comments explaining complex concepts
 - Suggest alternative implementations
 - Improve error handling patterns
@@ -111,23 +127,30 @@ This is primarily a learning project, but contributions that enhance the educati
 
 # 🤝 Fair Use Policy
 
-[![Fair OSS User](https://img.shields.io/badge/Fair--OSS--User-%E2%9C%94-green)](https://yourproject.org/fair-use)
-
-This project is licensed under the Apache 2.0 License and made available as open source in the spirit
+This project is licensed under the Apache 2.0 License and made available as
+open source in the spirit
 of collaboration and mutual benefit.
 
-We kindly ask all users — especially commercial users — to follow this Fair Use Policy:
+We kindly ask all users — especially commercial users — to follow this Fair
+Use Policy:
 
 ### 💡 If you use this project in production:
-- **Please contribute back** improvements, bug fixes, or enhancements whenever possible.
-- **Please consider sponsoring** the project, supporting long-term maintenance and development.
-- **Please open issues** if you encounter bugs or have ideas that could help others.
+
+- **Please contribute back** improvements, bug fixes, or enhancements whenever
+  possible.
+- **Please consider sponsoring** the project, supporting long-term maintenance
+  and development.
+- **Please open issues** if you encounter bugs or have ideas that could help
+  others.
 
 ### 🔁 If you modify or extend the project:
+
 - **Share your improvements** publicly, if possible.
-- If not, **let the maintainers know privately** — we’re open to collaboration, even under NDA if needed.
+- If not, **let the maintainers know privately** — we’re open to
+  collaboration, even under NDA if needed.
 
 ### 🌱 If you benefit from the project:
+
 - Give credit where due (e.g. in documentation or acknowledgments).
 - Advocate for open source sustainability in your company or organization.
 

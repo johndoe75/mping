@@ -5,7 +5,7 @@ use comfy_table::presets::UTF8_BORDERS_ONLY;
 use comfy_table::{ContentArrangement, Table};
 use futures::future::join_all;
 use mping::args::Args;
-use mping::constants::{LOSS_TIMEOUT, MILLISECOND_IN_SECOND, PERCENTAGE_FACTOR};
+use mping::constants::{LOSS_TIMEOUT, PERCENTAGE_FACTOR};
 use mping::display::DurationExt;
 use mping::ping::{PingResponse, PingResults};
 use mping::stats::OverallStats;
@@ -30,6 +30,7 @@ async fn main() -> Result<()> {
     if ping_delay < 0.1 {
         ping_delay = 0.1;
     }
+    let ping_delay = Duration::from_secs_f32(ping_delay);
 
     let mut targets = Vec::new();
     for host in hosts.iter() {
@@ -45,12 +46,11 @@ async fn main() -> Result<()> {
     }
 
     println!(
-        "PING {} hosts with {} packets each ...",
+        "PING {} hosts with {} packets each in {} intervals ...",
         targets.len(),
-        number_pings
+        number_pings,
+        ping_delay.display()
     );
-
-    let mut tasks = Vec::new();
 
     let client_v4 = Client::new(&Config::default()).unwrap_or_else(|e| {
         eprintln!("{}", e);
@@ -61,6 +61,7 @@ async fn main() -> Result<()> {
         std::process::exit(1);
     });
 
+    let mut tasks = Vec::new();
     for target in targets {
         let client = match target.addr {
             IpAddr::V4(_) => client_v4.clone(),
@@ -70,7 +71,7 @@ async fn main() -> Result<()> {
         tasks.push(tokio::spawn(ping(client, target, number_pings, ping_delay)));
     }
 
-    let results = join_all(tasks)
+    let mut results = join_all(tasks)
         .await
         .into_iter()
         .map(|r| r.unwrap())
@@ -78,13 +79,15 @@ async fn main() -> Result<()> {
 
     let overall_stats = OverallStats::from_results(&results);
 
-    let mut table = create_results_table(&results);
+    let mut table = create_results_table(&mut results);
     table
         .set_content_arrangement(ContentArrangement::Dynamic)
         .load_preset(UTF8_BORDERS_ONLY)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["Host", "Addr", "Sent", "Recv", "Loss", "Avg"]);
+        .set_header(vec![
+            "Host", "Addr", "Sent", "Recv", "Loss", "Min", "Max", "Avg",
+        ]);
 
     print!("\n{}\n\n", table);
     println!(
@@ -95,13 +98,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> PingResults {
+async fn ping(client: Client, target: PingTarget, count: u16, delay: Duration) -> PingResults {
     let payload = [0; 56];
     let mut pinger = client.pinger(target.addr, PingIdentifier(random())).await;
     pinger.timeout(Duration::from_secs(LOSS_TIMEOUT as u64));
-    let mut interval = time::interval(Duration::from_millis(
-        (delay * MILLISECOND_IN_SECOND as f32) as u64,
-    ));
+    let mut interval = time::interval(delay);
 
     let mut results: PingResults = PingResults::new(target);
 
@@ -111,16 +112,16 @@ async fn ping(client: Client, target: PingTarget, count: u16, delay: f32) -> Pin
             Ok((IcmpPacket::V4(_), duration)) => {
                 let response = PingResponse { duration };
 
-                results.add_success(response);
+                results.add_received(response);
             }
             Ok((IcmpPacket::V6(_), duration)) => {
                 let response = PingResponse { duration };
 
-                results.add_success(response);
+                results.add_received(response);
             }
             Err(e) => {
                 println!("{} ping error: {}", pinger.host, e);
-                results.add_drop();
+                results.add_loss();
             }
         };
     }
@@ -150,8 +151,10 @@ async fn resolve_host(host: &str) -> anyhow::Result<PingTarget> {
         .ok_or_else(|| anyhow!("{}: no address found", host))
 }
 
-fn create_results_table(results: &[PingResults]) -> Table {
+fn create_results_table(results: &mut Vec<PingResults>) -> Table {
     let mut table = Table::new();
+
+    let results = sort_results(results);
 
     for result in results {
         table.add_row(vec![
@@ -160,7 +163,14 @@ fn create_results_table(results: &[PingResults]) -> Table {
             &result.total_count().to_string(),
             &result.num_recv.to_string(),
             &format!("{:.1}%", result.loss_rate() * PERCENTAGE_FACTOR as f32),
-
+            &result
+                .min_duration
+                .map(|d| d.display())
+                .unwrap_or_else(|| "N/A".to_string()),
+            &result
+                .max_duration
+                .map(|d| d.display())
+                .unwrap_or_else(|| "N/A".to_string()),
             &result
                 .avg_duration()
                 .map(|d| d.display())
@@ -169,4 +179,19 @@ fn create_results_table(results: &[PingResults]) -> Table {
     }
 
     table
+}
+
+fn sort_results(results: &mut Vec<PingResults>) -> &Vec<PingResults> {
+    results.sort_by(|a, b| {
+        let a_avg = a.avg_duration().map(|d| d.as_micros());
+        let b_avg = b.avg_duration().map(|d| d.as_micros());
+        // Vergleiche die Durchschnittswerte, behandle None als größter Wert
+        match (a_avg, b_avg) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (Some(a_dur), Some(b_dur)) => a_dur.cmp(&b_dur),
+        }
+    });
+    results
 }
