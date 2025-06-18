@@ -11,7 +11,6 @@ pub async fn resolve_targets(ping_config: &PingConfig) -> Vec<PingTarget> {
         let target: PingTarget;
         if let Some(ping_target) = try_parse_ip_target(host) {
             target = reverse_resolve_ip(ping_target.addr).await.unwrap();
-            println!("{} resolved to {}", target, ping_target);
         } else {
             target = match resolve_hostname(host).await {
                 Ok(target) => target,
