@@ -1,5 +1,9 @@
-use crate::target::PingTarget;
+use crate::core::constants::LOSS_TIMEOUT;
+use crate::network::client::PingTarget;
+use rand::random;
 use std::time::Duration;
+use surge_ping::{Client, IcmpPacket, PingIdentifier, PingSequence};
+use tokio::time;
 
 #[derive(Debug)]
 pub struct PingResults {
@@ -82,4 +86,34 @@ impl PingResults {
 #[derive(Debug)]
 pub struct PingResponse {
     pub duration: Duration,
+}
+
+pub async fn ping(client: Client, target: PingTarget, count: u16, delay: Duration) -> PingResults {
+    let payload = [0; 56];
+    let mut pinger = client.pinger(target.addr, PingIdentifier(random())).await;
+    pinger.timeout(Duration::from_secs(LOSS_TIMEOUT as u64));
+    let mut interval = time::interval(delay);
+
+    let mut results: PingResults = PingResults::new(target);
+
+    for index in 0..count {
+        interval.tick().await;
+        match pinger.ping(PingSequence(index), &payload).await {
+            Ok((IcmpPacket::V4(_), duration)) => {
+                let response = PingResponse { duration };
+
+                results.add_received(response);
+            }
+            Ok((IcmpPacket::V6(_), duration)) => {
+                let response = PingResponse { duration };
+
+                results.add_received(response);
+            }
+            Err(e) => {
+                println!("{} ping error: {}", pinger.host, e);
+                results.add_loss();
+            }
+        };
+    }
+    results
 }

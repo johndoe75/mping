@@ -3,38 +3,26 @@
 
 [![Fair OSS User](https://img.shields.io/badge/Fair--OSS--User-%E2%9C%94-green)](https://yourproject.org/fair-use)
 
-A concurrent ping utility written in Rust for learning modern systems
-programming concepts.
+A concurrent ping utility written in Rust.
 
 ## Overview
 
 **mping** is a command-line tool that can ping multiple hosts simultaneously
-and display comprehensive statistics. This project serves as a practical
-learning exercise for exploring Rust's key features including async
-programming, error handling, and systems programming.
-
-## Learning Goals
-
-This project demonstrates several important Rust concepts:
-
-- **Async Programming**: Using `tokio` for concurrent network operations
-- **Error Handling**: Proper use of `Result<T>` and `anyhow` for error
-  management
-- **CLI Development**: Building command-line interfaces with `clap`
-- **Network Programming**: ICMP ping implementation using `surge-ping`
-- **Data Structures**: Organizing code with structs, enums, and impl blocks
-- **Memory Safety**: Zero-cost abstractions and ownership patterns
-- **External Crates**: Integration with the Rust ecosystem
+and display comprehensive statistics. Even though this tool solves a practical
+problem I have had in the past, *it mainly is for me a practical learning exercise*
+for exploring Rust's key features including async  programming, error handling,
+and systems programming.
 
 ## Features
 
-- **Concurrent Pinging**: Ping multiple hosts simultaneously using async/await
+- **Concurrent Pinging**: Ping multiple hosts simultaneously using async/await.
 - **Comprehensive Statistics**: Track sent/received packets, loss rates, and
-  timing statistics
+  timing statistics.
 - **Beautiful Output**: Formatted tables with UTF-8 borders using
-  `comfy-table`
-- **Flexible Configuration**: Customizable ping count and delay intervals
-- **Cross-Platform**: Works on macOS, Linux, and Windows
+  `comfy-table`.
+- **Flexible Configuration**: Customizable ping interval and number of ICMP 
+  packets to send.
+- **Cross-Platform**: Works on macOS, Linux, and Windows.
 
 ## Usage
 
@@ -46,11 +34,13 @@ mping google.com 8.8.8.8 cloudflare.com
 mping -c 10 -d 0.5 example.com 1.1.1.1
 
 # Ping with specific parameters
-mping --count 20 --delay 2.0 github.com stackoverflow.com
+mping --count 20 --delay 1.5 github.com stackoverflow.com
 ```
 
-The minimum delay between packets is 100 ms to avoid flooding hosts with ICMP
-packets.  If you specify a smaller delay, it is automatically set to 100 ms. 
+**Note:** The minimum delay between packets *is 100 ms to avoid flooding multiple hosts
+with ICMP packets*.  If you specify a smaller delay, it is automatically set
+to 100 ms. For flood pinging I ask you to use the
+[iputils ping](http://www.skbuff.net/iputils/) command.
 
 ## Sample Output
 
@@ -88,26 +78,15 @@ cargo build --release
 cargo run -- google.com 8.8.8.8
 ```
 
-## Project Structure
-``` 
-src/
-├── main.rs          # Main application logic and async orchestration
-├── args.rs          # Command-line argument parsing with clap
-├── ping.rs          # Ping result structures and statistics
-├── stats.rs         # Overall statistics calculation
-├── target.rs        # Ping target representation
-└── display.rs       # Duration formatting utilities
-```
-
 ## Dependencies
-- **tokio**: Async runtime for concurrent operations
-- : ICMP ping implementation **surge-ping**
-- : Command-line argument parsing **clap**
-- : Simplified error handling **anyhow**
-- : Beautiful table formatting **comfy-table**
-- **futures**: Async utilities
-- **colored**: Terminal color output
-- **rand**: Random number generation
+- [**tokio**](https://github.com/tokio-rs/tokio): Async runtime for concurrent operations
+- [**surge-ping**](https://github.com/kolapapa/surge-ping): ICMP ping implementation 
+- [**clap**](https://github.com/clap-rs/clap): Command-line argument parsing 
+- [**anyhow**](https://github.com/dtolnay/anyhow): Simplified error handling 
+- [**comfy-table**](https://github.com/Nukesor/comfy-table): Beautiful table formatting 
+- [**futures**](https://github.com/rust-lang/futures-rs): Async utilities
+- [**colored**](https://github.com/colored-rs/colored): Terminal color output
+- [**rand**](https://github.com/rust-random/rand): Random number generation
 
 ## Learning Resources
 This project explores concepts covered in:

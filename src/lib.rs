@@ -1,6 +1,4 @@
-pub mod args;
+pub mod core;
 pub mod display;
-pub mod ping;
+pub mod network;
 pub mod stats;
-pub mod target;
-pub mod constants;
