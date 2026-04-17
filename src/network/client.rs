@@ -52,3 +52,39 @@ impl std::fmt::Display for PingTarget {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn ping_target_new_has_no_host() {
+        let addr = IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8));
+        let target = PingTarget::new(addr);
+        assert_eq!(target.host, None);
+        assert_eq!(target.addr, addr);
+    }
+
+    #[test]
+    fn ping_target_with_host_sets_host() {
+        let addr = IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1));
+        let target = PingTarget::with_host("cloudflare.com".to_string(), addr);
+        assert_eq!(target.host, Some("cloudflare.com".to_string()));
+        assert_eq!(target.addr, addr);
+    }
+
+    #[test]
+    fn ping_target_display_without_host() {
+        let addr = IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8));
+        let target = PingTarget::new(addr);
+        assert_eq!(format!("{}", target), "8.8.8.8");
+    }
+
+    #[test]
+    fn ping_target_display_with_host() {
+        let addr = IpAddr::V6(Ipv6Addr::LOCALHOST);
+        let target = PingTarget::with_host("localhost".to_string(), addr);
+        assert_eq!(format!("{}", target), "localhost (::1)");
+    }
+}

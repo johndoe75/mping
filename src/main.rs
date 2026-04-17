@@ -48,12 +48,12 @@ async fn main() -> Result<()> {
 
     let overall_stats = OverallStats::from_results(&results);
 
-    let mut table = stats::create_results_table(&mut results);
+    stats::sort_results(&mut results);
+    let mut table = stats::create_results_table(&results);
     table
         .set_content_arrangement(ContentArrangement::Dynamic)
         .load_preset(UTF8_BORDERS_ONLY)
         .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             "Host", "Addr", "Sent", "Recv", "Loss", "Min", "Max", "Avg",
         ]);

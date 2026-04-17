@@ -68,3 +68,39 @@ pub async fn reverse_resolve_ip(addr: IpAddr) -> anyhow::Result<PingTarget> {
         })
         .ok_or_else(|| anyhow!("{}: no hostname found", ip_addr))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn try_parse_ipv4_address() {
+        let result = try_parse_ip_target("192.168.1.1");
+        assert!(result.is_some());
+        let target = result.unwrap();
+        assert_eq!(target.addr, IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
+        assert_eq!(target.host, None);
+    }
+
+    #[test]
+    fn try_parse_ipv6_address() {
+        let result = try_parse_ip_target("::1");
+        assert!(result.is_some());
+        let target = result.unwrap();
+        assert_eq!(target.addr, IpAddr::V6(Ipv6Addr::LOCALHOST));
+        assert_eq!(target.host, None);
+    }
+
+    #[test]
+    fn try_parse_hostname_returns_none() {
+        let result = try_parse_ip_target("example.com");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn try_parse_invalid_string_returns_none() {
+        let result = try_parse_ip_target("not-an-ip");
+        assert!(result.is_none());
+    }
+}
