@@ -31,10 +31,10 @@ and systems programming.
 mping google.com 8.8.8.8 cloudflare.com
 
 # Customize ping count and delay
-mping -c 10 -d 0.5 example.com 1.1.1.1
+mping -c 10 -d 500 example.com 1.1.1.1
 
 # Ping with specific parameters
-mping --count 20 --delay 1.5 github.com stackoverflow.com
+mping --count 20 --delay 1500 github.com stackoverflow.com
 ```
 
 **Note:** The minimum delay between packets *is 100 ms to avoid flooding multiple hosts

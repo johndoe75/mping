@@ -11,9 +11,9 @@ pub struct Args {
     #[clap(short, long)]
     pub count: Option<u16>,
 
-    /// Delay between packets in seconds (default: 1.0, min: 0.1)
+    /// Delay between packets in milliseconds (default: 1000, min: 100)
     #[clap(short, long)]
-    pub delay: Option<f32>,
+    pub delay: Option<u64>,
     #[clap(short, long)]
     pub verbose: bool,
 }
@@ -30,7 +30,7 @@ impl PingConfig {
     pub fn from_args(args: Args) -> Result<Self> {
         let hosts = args.hosts.ok_or_else(|| anyhow!("No hosts specified."))?;
         let count = args.count.unwrap_or(5);
-        let delay = Duration::from_secs_f32(args.delay.unwrap_or(1.0).max(0.1));
+        let delay = Duration::from_millis(args.delay.unwrap_or(1000).max(100));
 
         Ok(Self {
             hosts,
@@ -68,7 +68,7 @@ mod tests {
         let config = PingConfig::from_args(args).unwrap();
         assert_eq!(config.hosts, vec!["example.com"]);
         assert_eq!(config.packet_count, 5);
-        assert_eq!(config.interval, Duration::from_secs_f32(1.0));
+        assert_eq!(config.interval, Duration::from_millis(1000));
     }
 
     #[test]
@@ -76,12 +76,12 @@ mod tests {
         let args = Args {
             hosts: Some(vec!["example.com".to_string()]),
             count: Some(20),
-            delay: Some(2.0),
+            delay: Some(2000),
             verbose: false,
         };
         let config = PingConfig::from_args(args).unwrap();
         assert_eq!(config.packet_count, 20);
-        assert_eq!(config.interval, Duration::from_secs_f32(2.0));
+        assert_eq!(config.interval, Duration::from_millis(2000));
     }
 
     #[test]
@@ -89,11 +89,11 @@ mod tests {
         let args = Args {
             hosts: Some(vec!["example.com".to_string()]),
             count: None,
-            delay: Some(0.05),
+            delay: Some(50),
             verbose: false,
         };
         let config = PingConfig::from_args(args).unwrap();
-        assert_eq!(config.interval, Duration::from_secs_f32(0.1));
+        assert_eq!(config.interval, Duration::from_millis(100));
     }
 
     #[test]
@@ -125,11 +125,11 @@ mod tests {
         let args = Args {
             hosts: Some(vec!["example.com".to_string()]),
             count: None,
-            delay: Some(0.1),
+            delay: Some(100),
             verbose: false,
         };
         let config = PingConfig::from_args(args).unwrap();
-        assert_eq!(config.interval, Duration::from_secs_f32(0.1));
+        assert_eq!(config.interval, Duration::from_millis(100));
     }
 
     #[test]
@@ -145,15 +145,15 @@ mod tests {
     }
 
     #[test]
-    fn from_args_negative_delay_clamped_to_minimum() {
+    fn from_args_zero_delay_clamped_to_minimum() {
         let args = Args {
             hosts: Some(vec!["example.com".to_string()]),
             count: None,
-            delay: Some(-5.0),
+            delay: Some(0),
             verbose: false,
         };
         let config = PingConfig::from_args(args).unwrap();
-        assert_eq!(config.interval, Duration::from_secs_f32(0.1));
+        assert_eq!(config.interval, Duration::from_millis(100));
     }
 
     #[test]
@@ -161,11 +161,11 @@ mod tests {
         let args = Args {
             hosts: Some(vec!["example.com".to_string()]),
             count: None,
-            delay: Some(86400.0),
+            delay: Some(86_400_000),
             verbose: false,
         };
         let config = PingConfig::from_args(args).unwrap();
-        assert_eq!(config.interval, Duration::from_secs_f32(86400.0));
+        assert_eq!(config.interval, Duration::from_millis(86_400_000));
     }
 
     #[test]
