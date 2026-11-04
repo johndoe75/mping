@@ -1,4 +1,5 @@
 use crate::core::constants::LOSS_TIMEOUT;
+use crate::display::DurationExt;
 use crate::network::client::PingTarget;
 use rand::random;
 use std::time::Duration;
@@ -88,12 +89,19 @@ pub struct PingResponse {
     pub duration: Duration,
 }
 
-pub async fn ping(client: Client, target: PingTarget, count: u16, delay: Duration) -> PingResults {
+pub async fn ping(
+    client: Client,
+    target: PingTarget,
+    count: u16,
+    delay: Duration,
+    verbose: bool,
+) -> PingResults {
     let payload = [0; 56];
     let mut pinger = client.pinger(target.addr, PingIdentifier(random())).await;
     pinger.timeout(Duration::from_secs(LOSS_TIMEOUT as u64));
     let mut interval = time::interval(delay);
 
+    let addr = target.addr;
     let mut results: PingResults = PingResults::new(target);
 
     for index in 0..count {
@@ -102,15 +110,35 @@ pub async fn ping(client: Client, target: PingTarget, count: u16, delay: Duratio
             Ok((IcmpPacket::V4(_), duration)) => {
                 let response = PingResponse { duration };
 
+                if verbose {
+                    println!(
+                        "{} ({}): seq={} time {}",
+                        pinger.host,
+                        addr,
+                        index,
+                        response.duration.display()
+                    );
+                }
                 results.add_received(response);
             }
             Ok((IcmpPacket::V6(_), duration)) => {
                 let response = PingResponse { duration };
 
+                if verbose {
+                    println!(
+                        "{} ({}): seq={} time {}",
+                        pinger.host,
+                        addr,
+                        index,
+                        response.duration.display()
+                    );
+                }
                 results.add_received(response);
             }
             Err(e) => {
-                println!("{} ping error: {}", pinger.host, e);
+                if verbose {
+                    println!("{} ({}): seq={} timeout ({})", pinger.host, addr, index, e);
+                }
                 results.add_loss();
             }
         };

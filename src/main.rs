@@ -36,6 +36,7 @@ async fn main() -> Result<()> {
                 target,
                 config.packet_count,
                 config.interval,
+                config.verbose,
             ))
         })
         .collect::<Vec<_>>();
