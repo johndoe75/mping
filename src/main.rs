@@ -9,8 +9,10 @@ use mping::display::DurationExt;
 use mping::network::client::PingClients;
 use mping::network::ping;
 use mping::network::resolver::resolve_targets;
+use mping::bars;
 use mping::stats;
 use mping::stats::OverallStats;
+use tokio::sync::mpsc;
 
 type Result<T> = anyhow::Result<T>;
 
@@ -27,19 +29,40 @@ async fn main() -> Result<()> {
         config.interval.display()
     );
 
+    let (progress_tx, progress_rx) = mpsc::unbounded_channel();
+    let bar_task = if config.verbose {
+        None
+    } else {
+        let labels = targets.iter().map(|t| t.to_string()).collect();
+        Some(tokio::spawn(bars::run(labels, config.packet_count, progress_rx)))
+    };
+
     let tasks = targets
         .into_iter()
-        .map(|target| {
+        .enumerate()
+        .map(|(idx, target)| {
             let client = clients.get_client(target.addr).clone();
+            let progress = if config.verbose {
+                None
+            } else {
+                Some((idx, progress_tx.clone()))
+            };
             tokio::spawn(ping::ping(
                 client,
                 target,
                 config.packet_count,
                 config.interval,
                 config.verbose,
+                progress,
             ))
         })
         .collect::<Vec<_>>();
+
+    if let Some(task) = bar_task {
+        drop(progress_tx);
+        let _ = task.await;
+        println!();
+    }
 
     let mut results = join_all(tasks)
         .await

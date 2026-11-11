@@ -4,6 +4,7 @@ use crate::network::client::PingTarget;
 use rand::random;
 use std::time::Duration;
 use surge_ping::{Client, IcmpPacket, PingIdentifier, PingSequence};
+use tokio::sync::mpsc;
 use tokio::time;
 
 #[derive(Debug)]
@@ -95,6 +96,7 @@ pub async fn ping(
     count: u16,
     delay: Duration,
     verbose: bool,
+    progress: Option<(usize, mpsc::UnboundedSender<(usize, bool)>)>,
 ) -> PingResults {
     let payload = [0; 56];
     let mut pinger = client.pinger(target.addr, PingIdentifier(random())).await;
@@ -113,6 +115,9 @@ pub async fn ping(
                 if verbose {
                     println!("{}: seq={} time {}", label, index, response.duration.display());
                 }
+                if let Some((idx, tx)) = &progress {
+                    let _ = tx.send((*idx, true));
+                }
                 results.add_received(response);
             }
             Ok((IcmpPacket::V6(_), duration)) => {
@@ -121,11 +126,17 @@ pub async fn ping(
                 if verbose {
                     println!("{}: seq={} time {}", label, index, response.duration.display());
                 }
+                if let Some((idx, tx)) = &progress {
+                    let _ = tx.send((*idx, true));
+                }
                 results.add_received(response);
             }
             Err(e) => {
                 if verbose {
                     println!("{}: seq={} timeout ({})", label, index, e);
+                }
+                if let Some((idx, tx)) = &progress {
+                    let _ = tx.send((*idx, false));
                 }
                 results.add_loss();
             }
