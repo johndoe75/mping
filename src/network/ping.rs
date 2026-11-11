@@ -101,7 +101,7 @@ pub async fn ping(
     pinger.timeout(Duration::from_secs(LOSS_TIMEOUT as u64));
     let mut interval = time::interval(delay);
 
-    let addr = target.addr;
+    let label = target.to_string();
     let mut results: PingResults = PingResults::new(target);
 
     for index in 0..count {
@@ -111,13 +111,7 @@ pub async fn ping(
                 let response = PingResponse { duration };
 
                 if verbose {
-                    println!(
-                        "{} ({}): seq={} time {}",
-                        pinger.host,
-                        addr,
-                        index,
-                        response.duration.display()
-                    );
+                    println!("{}: seq={} time {}", label, index, response.duration.display());
                 }
                 results.add_received(response);
             }
@@ -125,19 +119,13 @@ pub async fn ping(
                 let response = PingResponse { duration };
 
                 if verbose {
-                    println!(
-                        "{} ({}): seq={} time {}",
-                        pinger.host,
-                        addr,
-                        index,
-                        response.duration.display()
-                    );
+                    println!("{}: seq={} time {}", label, index, response.duration.display());
                 }
                 results.add_received(response);
             }
             Err(e) => {
                 if verbose {
-                    println!("{} ({}): seq={} timeout ({})", pinger.host, addr, index, e);
+                    println!("{}: seq={} timeout ({})", label, index, e);
                 }
                 results.add_loss();
             }

@@ -10,7 +10,7 @@ pub async fn resolve_targets(ping_config: &PingConfig) -> Vec<PingTarget> {
     for host in ping_config.hosts.iter() {
         let target: PingTarget;
         if let Some(ping_target) = try_parse_ip_target(host) {
-            target = reverse_resolve_ip(ping_target.addr).await.unwrap();
+            target = ping_target;
         } else {
             target = match resolve_hostname(host).await {
                 Ok(target) => target,
@@ -53,20 +53,6 @@ pub async fn resolve_hostname(hostname: &str) -> anyhow::Result<PingTarget> {
             addr: addr.ip(),
         })
         .ok_or_else(|| anyhow!("{}: no address found", hostname))
-}
-
-pub async fn reverse_resolve_ip(addr: IpAddr) -> anyhow::Result<PingTarget> {
-    let ip_addr = addr.to_string();
-    // FIXME: lookup_host does only IP -> hostname, not the other way around.
-    let mut host_names = lookup_host(format!("{}:53", ip_addr)).await?;
-
-    host_names
-        .next()
-        .map(|hostname| PingTarget {
-            host: Some(hostname.to_string()),
-            addr: addr,
-        })
-        .ok_or_else(|| anyhow!("{}: no hostname found", ip_addr))
 }
 
 #[cfg(test)]
